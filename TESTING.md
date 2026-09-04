@@ -10,7 +10,7 @@ Three levels of testing: quick sanity checks → manual testing → automated te
 
 ### Run:
 ```bash
-cd projects/content-repurposer
+cd projects/resurge
 bash tests/test_quick.sh
 ```
 
@@ -29,7 +29,7 @@ bash tests/test_quick.sh
 
 ### Start Backend + Frontend:
 ```bash
-cd projects/content-repurposer
+cd projects/resurge
 make setup       # (only first time)
 make dev
 ```
@@ -87,7 +87,7 @@ ffmpeg -f lavfi -i testsrc=s=320x240:d=5 \
 
 ### API Tests:
 ```bash
-cd projects/content-repurposer
+cd projects/resurge
 source backend/.venv/bin/activate
 python3 tests/test_api.py
 ```
@@ -101,7 +101,7 @@ python3 tests/test_api.py
 
 ### Frontend Build Test:
 ```bash
-cd projects/content-repurposer/frontend
+cd projects/resurge/frontend
 npm run build
 ```
 
@@ -133,7 +133,7 @@ docker-compose up
 ```
 
 ### Scenario 4: GitHub Codespaces
-1. Go: https://github.com/m2ks79/content-repurposer/codespaces
+1. Go: https://github.com/m2ks79/resurge/codespaces
 2. Wait for auto-setup (2 min)
 3. Ports auto-exposed at top
 4. Click port 5173 → browser opens frontend

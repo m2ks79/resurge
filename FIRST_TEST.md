@@ -9,7 +9,7 @@ Let's verify everything works by running the app and uploading a test video.
 ## Step 1: Verify Setup (2 min)
 
 ```bash
-cd /Users/muhkhan7/VSCode/projects/content-repurposer
+cd /Users/muhkhan7/VSCode/projects/resurge
 bash tests/test_quick.sh
 ```
 
@@ -27,7 +27,7 @@ If you see warnings, that's OK. Errors need fixing first.
 ## Step 2: Start the App (3 min)
 
 ```bash
-cd /Users/muhkhan7/VSCode/projects/content-repurposer
+cd /Users/muhkhan7/VSCode/projects/resurge
 make dev
 ```
 

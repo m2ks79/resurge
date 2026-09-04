@@ -4,9 +4,9 @@ Claude AI integration for caption/content optimization
 """
 
 import os
-from anthropic import Anthropic
 
-client = Anthropic()
+# Lazy load Anthropic client to avoid import errors
+client = None
 
 
 class ClaudeOptimizer:
@@ -41,8 +41,21 @@ class ClaudeOptimizer:
 
     def __init__(self):
         self.api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set in .env")
+        self.client = None
+        # Note: Client is lazily initialized on first use
+        # This prevents import errors if ANTHROPIC_API_KEY is not set
+
+    def _get_client(self):
+        """Lazily initialize Anthropic client on first use"""
+        if self.client is None:
+            if not self.api_key:
+                raise ValueError("ANTHROPIC_API_KEY not set in .env")
+            try:
+                from anthropic import Anthropic
+                self.client = Anthropic(api_key=self.api_key)
+            except Exception as e:
+                raise Exception(f"Failed to initialize Anthropic client: {e}")
+        return self.client
 
     def optimize_for_platform(self, caption, platform='instagram'):
         """
@@ -65,7 +78,8 @@ class ClaudeOptimizer:
 
         prompt = self.PLATFORM_PROMPTS[platform]
 
-        message = client.messages.create(
+        claude = self._get_client()
+        message = claude.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=1024,
             messages=[

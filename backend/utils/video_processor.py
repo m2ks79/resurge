@@ -3,6 +3,7 @@ Video processing utilities - resize, crop, convert formats
 """
 
 import os
+import tempfile
 from pathlib import Path
 import subprocess
 import json
@@ -45,8 +46,11 @@ class VideoProcessor:
     }
 
     def __init__(self):
-        self.temp_dir = '/tmp/content-repurposer'
+        # Use simple temp directory in project root
+        self.temp_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'uploads')
+        self.temp_dir = os.path.abspath(self.temp_dir)
         os.makedirs(self.temp_dir, exist_ok=True)
+        print(f"✓ Upload directory: {self.temp_dir}")
 
     def get_video_info(self, filepath):
         """Get video duration and dimensions using ffprobe"""
@@ -97,8 +101,10 @@ class VideoProcessor:
                     add_watermark
                 )
 
+                # Return just the filename for download endpoint
+                filename = os.path.basename(output_filepath)
                 results[platform] = {
-                    'filepath': output_filepath,
+                    'filepath': filename,  # Just filename, not full path
                     'status': 'done',
                     'format': specs['format'],
                     'dimensions': f"{specs['width']}x{specs['height']}"
@@ -131,10 +137,34 @@ class VideoProcessor:
                 output_file
             ]
 
-            subprocess.run(cmd, check=True, capture_output=True)
+            print(f"\n🎬 Converting to {specs['format'].upper()}")
+            print(f"   Cmd: ffmpeg -i ... -vf scale={specs['width']}:{specs['height']} ...")
+
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)  # 5 min timeout
+            except subprocess.TimeoutExpired:
+                print(f"   ❌ TIMEOUT: Video processing took > 5 minutes")
+                raise Exception(f"FFmpeg timeout: Video processing took too long")
+
+            if result.returncode != 0:
+                error_msg = result.stderr if result.stderr else "Unknown error"
+                print(f"   ❌ FFmpeg returned {result.returncode}")
+                print(f"   Error: {error_msg[:500]}")  # Print first 500 chars
+                raise Exception(f"FFmpeg failed: {error_msg[:200]}")
+
+            if not os.path.exists(output_file):
+                print(f"   ❌ Output file not created")
+                raise Exception(f"FFmpeg did not create output file: {output_file}")
+
+            file_size = os.path.getsize(output_file) / 1024 / 1024
+            print(f"   ✓ Created: {os.path.basename(output_file)} ({file_size:.1f} MB)")
 
         except subprocess.CalledProcessError as e:
-            raise Exception(f"FFmpeg conversion failed: {e.stderr.decode()}")
+            print(f"   ❌ CalledProcessError: {e}")
+            raise Exception(f"FFmpeg conversion failed: {e.stderr.decode() if e.stderr else str(e)}")
+        except Exception as e:
+            print(f"   ❌ Exception: {str(e)[:200]}")
+            raise
 
     def add_watermark(self, video_path, watermark_text="@yourbrand"):
         """Add text watermark to video"""

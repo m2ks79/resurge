@@ -1,14 +1,22 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
-import './App.css'
+
+const PLATFORMS = [
+  { name: 'TikTok', icon: '🎵', color: '#000000', size: '1080×1920' },
+  { name: 'Instagram', icon: '📷', color: '#E4405F', size: '1080×1920' },
+  { name: 'YouTube', icon: '▶️', color: '#FF0000', size: '1080×1920' },
+  { name: 'LinkedIn', icon: '💼', color: '#0A66C2', size: '1080×1080' },
+]
 
 export default function App() {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
   const [addWatermark, setAddWatermark] = useState(false)
+  const [currentStep, setCurrentStep] = useState('idle') // idle, uploading, converting, complete
 
   const onDrop = useCallback(acceptedFiles => {
     if (acceptedFiles.length > 0) {
@@ -32,21 +40,38 @@ export default function App() {
 
     setUploading(true)
     setError(null)
+    setCurrentStep('uploading')
+    setProgress(0)
 
     try {
       const formData = new FormData()
       formData.append('video', file)
       formData.append('watermark', addWatermark)
 
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setProgress(p => Math.min(p + Math.random() * 30, 90))
+      }, 500)
+
       const response = await axios.post('/api/repurpose', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
 
+      clearInterval(progressInterval)
+      setProgress(100)
+      setCurrentStep('complete')
       setResults(response.data.formats)
       console.log('Repurposing complete:', response.data)
+
+      // Show confetti animation briefly
+      setTimeout(() => {
+        setCurrentStep('idle')
+      }, 2000)
     } catch (err) {
-      console.error('Upload error:', err)
-      setError(err.response?.data?.error || 'Failed to repurpose video')
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to repurpose video'
+      console.error('Upload error:', errorMsg)
+      setError(errorMsg)
+      setCurrentStep('idle')
     } finally {
       setUploading(false)
     }
@@ -103,34 +128,68 @@ export default function App() {
           </form>
         </div>
 
-        {results && (
-          <div className="results">
-            <h2>Your Videos Are Ready! 🎉</h2>
-            <div className="formats-grid">
-              {Object.entries(results).map(([platform, data]) => (
-                <div key={platform} className="format-card">
-                  <h3>{platform.charAt(0).toUpperCase() + platform.slice(1)}</h3>
-                  <p className="dimensions">{data.dimensions}</p>
-                  {data.status === 'done' ? (
-                    <>
-                      <p className="status ok">✓ Ready</p>
-                      <a href={`/api/download/${data.filepath}`} className="btn-download">
-                        Download
-                      </a>
-                    </>
-                  ) : (
-                    <p className="status error">✗ {data.error}</p>
-                  )}
+        {uploading && (
+          <div className="progress-section">
+            <h2>🎬 Converting Your Video...</h2>
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+            </div>
+            <p className="progress-text">{Math.round(progress)}% Complete</p>
+            <div className="converting-platforms">
+              {PLATFORMS.map((p) => (
+                <div key={p.name} className="platform-item">
+                  <span className="platform-icon">{p.icon}</span>
+                  <span className="platform-name">{p.name}</span>
                 </div>
               ))}
             </div>
+          </div>
+        )}
 
-            <button className="btn-secondary" onClick={() => {
-              setFile(null)
-              setResults(null)
-            }}>
-              Repurpose Another Video
-            </button>
+        {results && (
+          <div className="results">
+            <div className="results-header">
+              <h2>🎉 Videos Ready!</h2>
+              <p>Your content is optimized for all platforms</p>
+            </div>
+
+            <div className="formats-grid">
+              {Object.entries(results).map(([platform, data]) => {
+                const platformInfo = PLATFORMS.find(p => p.name.toLowerCase() === platform.toLowerCase())
+                return (
+                  <div key={platform} className="format-card" style={{
+                    '--platform-color': platformInfo?.color || '#666'
+                  }}>
+                    <div className="card-header">
+                      <span className="platform-icon">{platformInfo?.icon}</span>
+                      <h3>{platform.charAt(0).toUpperCase() + platform.slice(1)}</h3>
+                    </div>
+                    <p className="dimensions">{data.dimensions}</p>
+                    {data.status === 'done' ? (
+                      <>
+                        <p className="status ok">✓ Ready to Download</p>
+                        <a href={`/api/download/${data.filepath}`} className="btn-download">
+                          📥 Download
+                        </a>
+                      </>
+                    ) : (
+                      <p className="status error">✗ {data.error}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="results-actions">
+              <button className="btn-secondary" onClick={() => {
+                setFile(null)
+                setResults(null)
+                setProgress(0)
+              }}>
+                ➕ Convert Another Video
+              </button>
+              <p className="results-tip">💡 Tip: Share these videos across all platforms for maximum reach!</p>
+            </div>
           </div>
         )}
       </main>
