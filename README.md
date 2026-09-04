@@ -22,7 +22,7 @@ Your content surges everywhere. One upload, four platforms, infinite reach.
 - ⚡ Batch processing (4 formats at once)
 - 💾 One-click download all versions
 
-### Phase 2 🎯 (In Development)
+### Phase 2 ✅ (Released)
 - 🤖 AI-powered captions (platform-specific)
 - #️⃣ Auto-generated hashtags
 - 😊 Emoji recommendations
@@ -297,7 +297,7 @@ make dev  # Starts both backend and frontend
 ## 📋 Roadmap
 
 - [x] Phase 1: Basic repurposing
-- [ ] Phase 2: AI captions + hashtags
+- [x] Phase 2: AI captions + hashtags
 - [ ] Phase 3: Direct publishing
 - [ ] Phase 4: Analytics dashboard
 - [ ] Phase 5: Team collaboration

@@ -1,183 +1,118 @@
 """
-Claude AI integration for caption/content optimization
-(Phase 2 feature - smart captions per platform)
+Claude AI integration for platform-specific caption generation (Phase 2)
+
+One API call generates captions for every requested platform at once,
+using structured outputs so the response is always valid JSON.
 """
 
-import os
+import anthropic
 
-# Lazy load Anthropic client to avoid import errors
-client = None
+MODEL = "claude-opus-5"
+
+SUPPORTED_PLATFORMS = ('tiktok', 'instagram', 'youtube', 'linkedin')
+
+PLATFORM_STYLE_GUIDE = """You write social media captions for content creators.
+Follow each platform's conventions exactly:
+
+- tiktok: Gen Z voice, trendy, punchy, max 150 characters before hashtags.
+  3-5 hashtags mixing broad reach (#fyp-style) with niche tags. Playful emojis.
+- instagram: Engaging and personable, max 300 characters. Open with a hook line,
+  end with a question or call-to-action. 3-5 hashtags, 2-3 emojis.
+- youtube: Clear and informative for Shorts, max 200 characters. Key topic in the
+  first few words, one call-to-action (subscribe/watch). 2-3 hashtags, 0-2 emojis.
+- linkedin: Professional, insight-led, max 250 characters. Lead with a takeaway
+  or lesson, thought-leadership tone. 2-3 industry hashtags, at most 1 emoji.
+
+Hashtags go in the "hashtags" array only - never inside the caption text.
+Captions must be ready to paste as-is."""
 
 
 class ClaudeOptimizer:
-    """Use Claude to optimize captions for each platform"""
-
-    PLATFORM_PROMPTS = {
-        'tiktok': """Optimize this caption for TikTok (Gen Z audience, trendy, fun, max 150 chars).
-        - Use trending slang
-        - Add 3-5 relevant hashtags
-        - Include fun emojis
-        - Make it punchy and engaging""",
-
-        'instagram': """Optimize this caption for Instagram (professional yet engaging, max 300 chars).
-        - Use 3-5 relevant hashtags
-        - Professional tone but personable
-        - Include 2-3 strategic emojis
-        - Focus on engagement (questions, calls-to-action)""",
-
-        'youtube': """Optimize this caption for YouTube Shorts (clear, informative, max 200 chars).
-        - Include 2-3 relevant hashtags
-        - Add call-to-action
-        - Include 1-2 emojis
-        - Mention key topic upfront""",
-
-        'linkedin': """Optimize this caption for LinkedIn (professional, B2B focus, max 250 chars).
-        - Use industry-relevant hashtags (2-3)
-        - Professional tone
-        - Include insights or takeaways
-        - Minimal emojis (0-1)
-        - Add thought leadership angle"""
-    }
+    """Generate platform-optimized captions with the Claude API"""
 
     def __init__(self):
-        self.api_key = os.getenv('ANTHROPIC_API_KEY')
-        self.client = None
-        # Note: Client is lazily initialized on first use
-        # This prevents import errors if ANTHROPIC_API_KEY is not set
+        self._client = None
 
     def _get_client(self):
-        """Lazily initialize Anthropic client on first use"""
-        if self.client is None:
-            if not self.api_key:
-                raise ValueError("ANTHROPIC_API_KEY not set in .env")
-            try:
-                from anthropic import Anthropic
-                self.client = Anthropic(api_key=self.api_key)
-            except Exception as e:
-                raise Exception(f"Failed to initialize Anthropic client: {e}")
-        return self.client
+        # Lazy init so the app starts fine without credentials configured;
+        # Anthropic() resolves ANTHROPIC_API_KEY (loaded from .env by config.py)
+        # or a local `ant auth login` profile.
+        if self._client is None:
+            self._client = anthropic.Anthropic()
+        return self._client
 
-    def optimize_for_platform(self, caption, platform='instagram'):
-        """
-        Use Claude to optimize caption for specific platform
-
-        Args:
-            caption: Original caption text
-            platform: 'tiktok', 'instagram', 'youtube', or 'linkedin'
-
-        Returns:
-            {
-                'caption': 'optimized caption',
-                'hashtags': ['#tag1', '#tag2', ...],
-                'emojis': ['🎬', '📸', ...],
-                'platform': 'instagram'
-            }
-        """
-        if platform not in self.PLATFORM_PROMPTS:
-            raise ValueError(f"Unknown platform: {platform}")
-
-        prompt = self.PLATFORM_PROMPTS[platform]
-
-        claude = self._get_client()
-        message = claude.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""{prompt}
-
-Original caption: "{caption}"
-
-Return response in JSON format:
-{{
-    "optimized_caption": "your optimized caption here",
-    "hashtags": ["#tag1", "#tag2", "#tag3"],
-    "emojis": ["emoji1", "emoji2"],
-    "reasoning": "brief explanation of changes"
-}}"""
-                }
-            ]
-        )
-
-        # Parse response
-        response_text = message.content[0].text
-
-        # Extract JSON from response
-        import json
-        try:
-            # Try to parse as JSON directly
-            result = json.loads(response_text)
-        except json.JSONDecodeError:
-            # Claude might wrap it in markdown code blocks
-            import re
-            json_match = re.search(r'```(?:json)?\n(.*?)\n```', response_text, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group(1))
-            else:
-                # Fallback: return original with empty extras
-                result = {
-                    'optimized_caption': caption,
-                    'hashtags': [],
-                    'emojis': [],
-                    'reasoning': 'Could not parse Claude response'
-                }
-
+    @staticmethod
+    def _captions_schema(platforms):
+        platform_schema = {
+            "type": "object",
+            "properties": {
+                "caption": {"type": "string"},
+                "hashtags": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["caption", "hashtags"],
+            "additionalProperties": False,
+        }
         return {
-            'caption': result.get('optimized_caption', caption),
-            'hashtags': result.get('hashtags', []),
-            'emojis': result.get('emojis', []),
-            'platform': platform,
-            'reasoning': result.get('reasoning', '')
+            "type": "object",
+            "properties": {p: platform_schema for p in platforms},
+            "required": list(platforms),
+            "additionalProperties": False,
         }
 
-    def generate_caption(self, video_description, platform='instagram'):
+    def generate_captions(self, description, platforms=SUPPORTED_PLATFORMS, draft_caption=None):
         """
-        Generate a full caption from scratch for a video
+        Generate captions for all requested platforms in a single API call.
 
         Args:
-            video_description: Brief description of video content
-            platform: Target platform
+            description: What the video is about.
+            platforms: Which platforms to write for (default: all four).
+            draft_caption: Optional existing caption to adapt instead of
+                writing from scratch.
 
         Returns:
-            Same format as optimize_for_platform()
+            {"tiktok": {"caption": str, "hashtags": [str, ...]}, ...}
         """
-        prompt = f"Create an engaging {platform} caption for a video about: {video_description}\n{self.PLATFORM_PROMPTS.get(platform, '')}"
+        import json
 
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""{prompt}
+        platforms = [p for p in platforms if p in SUPPORTED_PLATFORMS]
+        if not platforms:
+            raise ValueError(
+                f"No valid platforms given. Supported: {', '.join(SUPPORTED_PLATFORMS)}"
+            )
 
-Return response in JSON format:
-{{
-    "optimized_caption": "your generated caption",
-    "hashtags": ["#tag1", "#tag2"],
-    "emojis": ["emoji1", "emoji2"]
-}}"""
+        if draft_caption:
+            task = (
+                f'Adapt this draft caption for each platform: "{draft_caption}"\n'
+                f"Video context: {description or 'not provided'}"
+            )
+        else:
+            task = f"Write a caption for each platform. The video is about: {description}"
+
+        client = self._get_client()
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=2048,
+            system=PLATFORM_STYLE_GUIDE,
+            messages=[{"role": "user", "content": task}],
+            output_config={
+                "format": {
+                    "type": "json_schema",
+                    "schema": self._captions_schema(platforms),
                 }
-            ]
+            },
         )
 
-        response_text = message.content[0].text
+        text = next(block.text for block in response.content if block.type == "text")
+        return json.loads(text)
 
-        import json
-        import re
-        try:
-            result = json.loads(response_text)
-        except json.JSONDecodeError:
-            json_match = re.search(r'```(?:json)?\n(.*?)\n```', response_text, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group(1))
-            else:
-                result = {'optimized_caption': video_description, 'hashtags': [], 'emojis': []}
-
+    def optimize_for_platform(self, caption, platform='instagram'):
+        """Backward-compatible single-platform helper used by /api/optimize-caption."""
+        result = self.generate_captions(
+            description=None, platforms=[platform], draft_caption=caption
+        )[platform]
         return {
-            'caption': result.get('optimized_caption', ''),
-            'hashtags': result.get('hashtags', []),
-            'emojis': result.get('emojis', []),
-            'platform': platform
+            'caption': result['caption'],
+            'hashtags': result['hashtags'],
+            'emojis': [],
+            'platform': platform,
         }

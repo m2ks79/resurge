@@ -474,3 +474,108 @@ body {
     padding: 0.8rem 1rem;
   }
 }
+
+/* Phase 2: AI Captions */
+.captions-section {
+  margin-top: 2rem;
+}
+
+.captions-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.captions-header h2 {
+  font-size: 1.6rem;
+  margin-bottom: 0.4rem;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.captions-header p {
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+
+.caption-input {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s ease;
+}
+
+.caption-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.captions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.caption-card {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--platform-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: fadeIn 0.4s ease;
+}
+
+.caption-card .card-header {
+  justify-content: flex-start;
+  margin-bottom: 0;
+}
+
+.caption-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.caption-hashtags {
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.btn-copy {
+  align-self: flex-start;
+  padding: 0.5rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: auto;
+}
+
+.btn-copy:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 640px) {
+  .captions-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -9,7 +9,7 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from config import Config
 from utils.video_processor import VideoProcessor
-from utils.claude_optimizer import ClaudeOptimizer
+from utils.claude_optimizer import ClaudeOptimizer, SUPPORTED_PLATFORMS
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -123,6 +123,61 @@ def repurpose_video():
         error_msg = str(e)
         print(f"ERROR in /api/repurpose: {error_msg}")
         return jsonify({'error': error_msg}), 500
+
+
+def _caption_error_response(e):
+    """Map Anthropic API errors to friendly HTTP responses."""
+    import anthropic
+    # No credentials at all -> the SDK raises at client construction, before any request
+    if 'Could not resolve authentication method' in str(e):
+        return jsonify({'error': 'AI captions are not configured. Set ANTHROPIC_API_KEY '
+                                 'in backend/.env (get a key at console.anthropic.com).'}), 503
+    if isinstance(e, anthropic.AuthenticationError):
+        return jsonify({'error': 'AI captions are not configured. Set ANTHROPIC_API_KEY '
+                                 'in backend/.env (get a key at console.anthropic.com).'}), 503
+    if isinstance(e, anthropic.RateLimitError):
+        return jsonify({'error': 'AI caption service is busy. Try again in a minute.'}), 429
+    if isinstance(e, anthropic.APIStatusError):
+        return jsonify({'error': f'AI caption service error ({e.status_code}). Try again shortly.'}), 502
+    if isinstance(e, anthropic.APIConnectionError):
+        return jsonify({'error': 'Could not reach the AI caption service. Check the server\'s '
+                                 'internet connection.'}), 502
+    return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/captions', methods=['POST'])
+def generate_captions():
+    """
+    (Phase 2) Generate AI captions for all platforms in one request.
+
+    Request JSON:
+        - description: str  (what the video is about)
+        - draft_caption: str (optional - existing caption to adapt)
+        - platforms: [str] (optional - defaults to all four)
+
+    Response:
+        - {"status": "success",
+           "captions": {"tiktok": {"caption": "...", "hashtags": ["#..."]}, ...}}
+    """
+    data = request.get_json(silent=True) or {}
+    description = (data.get('description') or '').strip()
+    draft_caption = (data.get('draft_caption') or '').strip() or None
+    platforms = data.get('platforms') or list(SUPPORTED_PLATFORMS)
+
+    if not description and not draft_caption:
+        return jsonify({'error': 'Provide a video description or a draft caption'}), 400
+
+    try:
+        print(f"\n✨ /api/captions: platforms={platforms}")
+        captions = optimizer.generate_captions(
+            description=description, platforms=platforms, draft_caption=draft_caption
+        )
+        return jsonify({'status': 'success', 'captions': captions}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f"   ❌ Caption error: {e}")
+        return _caption_error_response(e)
 
 
 @app.route('/api/optimize-caption', methods=['POST'])

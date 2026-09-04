@@ -18,6 +18,38 @@ export default function App() {
   const [addWatermark, setAddWatermark] = useState(false)
   const [currentStep, setCurrentStep] = useState('idle') // idle, uploading, converting, complete
 
+  // Phase 2: AI captions
+  const [description, setDescription] = useState('')
+  const [captions, setCaptions] = useState(null)
+  const [captionsLoading, setCaptionsLoading] = useState(false)
+  const [captionsError, setCaptionsError] = useState(null)
+  const [copiedPlatform, setCopiedPlatform] = useState(null)
+
+  const handleGenerateCaptions = async () => {
+    if (!description.trim()) {
+      setCaptionsError('Describe your video first')
+      return
+    }
+    setCaptionsLoading(true)
+    setCaptionsError(null)
+    try {
+      const response = await axios.post('/api/captions', { description })
+      setCaptions(response.data.captions)
+    } catch (err) {
+      setCaptionsError(err.response?.data?.error || 'Failed to generate captions')
+    } finally {
+      setCaptionsLoading(false)
+    }
+  }
+
+  const copyCaption = (platform, data) => {
+    const text = `${data.caption}\n\n${data.hashtags.join(' ')}`
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedPlatform(platform)
+      setTimeout(() => setCopiedPlatform(null), 2000)
+    })
+  }
+
   const onDrop = useCallback(acceptedFiles => {
     if (acceptedFiles.length > 0) {
       setFile(acceptedFiles[0])
@@ -185,6 +217,9 @@ export default function App() {
                 setFile(null)
                 setResults(null)
                 setProgress(0)
+                setCaptions(null)
+                setDescription('')
+                setCaptionsError(null)
               }}>
                 ➕ Convert Another Video
               </button>
@@ -192,10 +227,55 @@ export default function App() {
             </div>
           </div>
         )}
+
+        <div className="upload-section captions-section">
+          <div className="captions-header">
+            <h2>✨ AI Captions</h2>
+            <p>Describe your video and get a ready-to-post caption for every platform</p>
+          </div>
+          <textarea
+            className="caption-input"
+            rows={3}
+            placeholder="What's this video about? e.g. 5 morning habits that doubled my productivity"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          {captionsError && <div className="error">{captionsError}</div>}
+          <button
+            className="btn-primary"
+            onClick={handleGenerateCaptions}
+            disabled={captionsLoading}
+          >
+            {captionsLoading ? '✨ Writing captions...' : '✨ Generate Captions'}
+          </button>
+
+          {captions && (
+            <div className="captions-grid">
+              {Object.entries(captions).map(([platform, data]) => {
+                const platformInfo = PLATFORMS.find(p => p.name.toLowerCase() === platform.toLowerCase())
+                return (
+                  <div key={platform} className="caption-card" style={{
+                    '--platform-color': platformInfo?.color || '#666'
+                  }}>
+                    <div className="card-header">
+                      <span className="platform-icon">{platformInfo?.icon}</span>
+                      <h3>{platform.charAt(0).toUpperCase() + platform.slice(1)}</h3>
+                    </div>
+                    <p className="caption-text">{data.caption}</p>
+                    <p className="caption-hashtags">{data.hashtags.join(' ')}</p>
+                    <button className="btn-copy" onClick={() => copyCaption(platform, data)}>
+                      {copiedPlatform === platform ? '✓ Copied!' : '📋 Copy'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </main>
 
       <footer className="footer">
-        <p>Phase 1: Basic repurposing | Phase 2 coming soon: Smart captions + scheduling</p>
+        <p>Phase 1: Repurposing ✓ | Phase 2: AI captions ✓ | Phase 3 coming soon: Scheduling</p>
       </footer>
     </div>
   )
