@@ -9,7 +9,7 @@ Complete checklist to launch Resurge and make it available everywhere.
 ### Step 1: Rename Repository Locally
 
 ```bash
-cd /Users/muhkhan7/VSCode/projects
+cd /Users/yourusername/VSCode/projects
 mv content-repurposer resurge
 cd resurge
 ```
@@ -122,7 +122,7 @@ Help us grow! Share Resurge:
 # 1. In VS Code, open terminal (Ctrl + `)
 
 # 2. Navigate to Resurge
-cd /Users/muhkhan7/VSCode/projects/resurge
+cd /Users/yourusername/VSCode/projects/resurge
 
 # 3. Start the app
 make dev
